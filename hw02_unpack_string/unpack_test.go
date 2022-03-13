@@ -43,3 +43,14 @@ func TestUnpackInvalidString(t *testing.T) {
 		})
 	}
 }
+
+func TestCyrilicString(t *testing.T) {
+	cyrilicStrings := []string{"Повто2р3и", "Эт3о"}
+	for _, tc := range cyrilicStrings {
+		tc := tc
+		t.Run(tc, func(t *testing.T) {
+			_, err := Unpack(tc)
+			require.Truef(t, err == nil, "actual error %q", err)
+		})
+	}
+}
