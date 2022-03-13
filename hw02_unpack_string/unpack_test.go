@@ -45,7 +45,7 @@ func TestUnpackInvalidString(t *testing.T) {
 }
 
 func TestCyrilicString(t *testing.T) {
-	cyrilicStrings := []string{"Повто2р3и", "Эт3о"}
+	cyrilicStrings := []string{"Пов2то2р3и", "Эт3о"}
 	for _, tc := range cyrilicStrings {
 		tc := tc
 		t.Run(tc, func(t *testing.T) {
