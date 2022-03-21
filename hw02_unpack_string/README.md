@@ -38,5 +38,5 @@
 - https://golang.org/ref/spec#String_literals
 - `unicode.IsDigit`
 - `strings.Builder`
-- `strings.Repeat`
 - `strconv.Atoi`
+- `strings.Repeat`
