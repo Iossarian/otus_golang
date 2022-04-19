@@ -14,23 +14,27 @@ func Run(tasks []Task, n, m int) error {
 	wg := sync.WaitGroup{}
 	ch := make(chan Task)
 	errCount := 0
-	mutex := sync.Mutex{}
+	mutexOne := sync.Mutex{}
+	//mutexTwo := sync.Mutex{}
 	for i := 1; i <= n; i++ {
-		go func(ci chan Task) {
+		go func(erCnt *int, ci chan Task) {
 			defer wg.Done()
 			wg.Add(1)
 			for task := range ci {
 				taskError := task()
-				if taskError != nil && errCount < m {
-					mutex.Lock()
-					errCount++
-					mutex.Unlock()
+				if taskError != nil {
+					mutexOne.Lock()
+					*erCnt++
+					mutexOne.Unlock()
 				}
 			}
-		}(ch)
+		}(&errCount, ch)
 	}
 	for _, t := range tasks {
-		if errCount == m {
+		mutexOne.Lock()
+		errCnt := errCount
+		mutexOne.Unlock()
+		if errCnt == m {
 			close(ch)
 			return ErrErrorsLimitExceeded
 		}
