@@ -17,20 +17,11 @@ func Run(tasks []Task, n, m int) error {
 	taskCh := make(chan Task)
 	defer close(taskCh)
 	wg.Add(n)
+
 	for i := 1; i <= n; i++ {
-		go func() {
-			defer wg.Done()
-			for task := range taskCh {
-				taskError := task()
-				if taskError != nil {
-					select {
-					case errorCh <- struct{}{}:
-					default:
-					}
-				}
-			}
-		}()
+		go doTask(&wg, taskCh, errorCh)
 	}
+
 	errCount := 0
 	for _, task := range tasks {
 		select {
@@ -43,5 +34,19 @@ func Run(tasks []Task, n, m int) error {
 		}
 		taskCh <- task
 	}
+
 	return nil
+}
+
+func doTask(wg *sync.WaitGroup, taskCh chan Task, errorCh chan struct{}) {
+	defer wg.Done()
+	for task := range taskCh {
+		taskError := task()
+		if taskError != nil {
+			select {
+			case errorCh <- struct{}{}:
+			default:
+			}
+		}
+	}
 }
