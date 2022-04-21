@@ -9,38 +9,39 @@ var ErrErrorsLimitExceeded = errors.New("errors limit exceeded")
 
 type Task func() error
 
-// Run starts tasks in n goroutines and stops its work when receiving m errors from tasks.
 func Run(tasks []Task, n, m int) error {
+	errorCh := make(chan struct{}, m)
+	defer close(errorCh)
 	wg := sync.WaitGroup{}
-	ch := make(chan Task)
-	errCount := 0
-	mutexOne := sync.Mutex{}
-	//mutexTwo := sync.Mutex{}
+	defer wg.Wait()
+	taskCh := make(chan Task)
+	defer close(taskCh)
+	wg.Add(n)
 	for i := 1; i <= n; i++ {
-		go func(erCnt *int, ci chan Task) {
+		go func() {
 			defer wg.Done()
-			wg.Add(1)
-			for task := range ci {
+			for task := range taskCh {
 				taskError := task()
 				if taskError != nil {
-					mutexOne.Lock()
-					*erCnt++
-					mutexOne.Unlock()
+					select {
+					case errorCh <- struct{}{}:
+					default:
+					}
 				}
 			}
-		}(&errCount, ch)
+		}()
 	}
-	for _, t := range tasks {
-		mutexOne.Lock()
-		errCnt := errCount
-		mutexOne.Unlock()
-		if errCnt == m {
-			close(ch)
-			return ErrErrorsLimitExceeded
+	errCount := 0
+	for _, task := range tasks {
+		select {
+		case <-errorCh:
+			errCount++
+			if m > 0 && errCount >= m {
+				return ErrErrorsLimitExceeded
+			}
+		default:
 		}
-		ch <- t
+		taskCh <- task
 	}
-	close(ch)
-	wg.Wait()
 	return nil
 }
