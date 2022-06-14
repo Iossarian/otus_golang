@@ -1,67 +1,56 @@
 package hw10programoptimization
 
 import (
-	"encoding/json"
-	"fmt"
+	"bufio"
+	"errors"
+	jsoniter "github.com/json-iterator/go"
 	"io"
-	"io/ioutil"
-	"regexp"
 	"strings"
 )
 
 type User struct {
-	ID       int
-	Name     string
-	Username string
-	Email    string
-	Phone    string
-	Password string
-	Address  string
+	ID       int    `json:"-"`
+	Name     string `json:"-"`
+	Username string `json:"-"`
+	Email    string `json:"Email"`
+	Phone    string `json:"-"`
+	Password string `json:"-"`
+	Address  string `json:"-"`
 }
 
 type DomainStat map[string]int
 
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
+
 func GetDomainStat(r io.Reader, domain string) (DomainStat, error) {
-	u, err := getUsers(r)
-	if err != nil {
-		return nil, fmt.Errorf("get users error: %w", err)
-	}
-	return countDomains(u, domain)
-}
-
-type users [100_000]User
-
-func getUsers(r io.Reader) (result users, err error) {
-	content, err := ioutil.ReadAll(r)
-	if err != nil {
-		return
-	}
-
-	lines := strings.Split(string(content), "\n")
-	for i, line := range lines {
-		var user User
-		if err = json.Unmarshal([]byte(line), &user); err != nil {
-			return
-		}
-		result[i] = user
-	}
-	return
-}
-
-func countDomains(u users, domain string) (DomainStat, error) {
+	reader := bufio.NewReader(r)
 	result := make(DomainStat)
 
-	for _, user := range u {
-		matched, err := regexp.Match("\\."+domain, []byte(user.Email))
+	isEOF := false
+	for {
+		lineContent, _, err := reader.ReadLine()
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				isEOF = true
+			} else {
+				return result, err
+			}
+		}
+
+		var user User
+		if err := json.Unmarshal(lineContent, &user); err != nil && !isEOF {
 			return nil, err
 		}
 
+		matched := strings.Contains(user.Email, domain)
 		if matched {
-			num := result[strings.ToLower(strings.SplitN(user.Email, "@", 2)[1])]
-			num++
-			result[strings.ToLower(strings.SplitN(user.Email, "@", 2)[1])] = num
+			result[strings.ToLower(strings.SplitN(user.Email, "@", 2)[1])]++
+		}
+
+		if isEOF {
+			break
 		}
 	}
+
 	return result, nil
 }
