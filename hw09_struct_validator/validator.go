@@ -25,6 +25,9 @@ func (v ValidationErrors) Error() string {
 	return strings.Join(validationErrors, "\n")
 }
 
+var minValueValidationRegexp = regexp.MustCompile("min:(\\d+)")
+var maxValueValidationRegexp = regexp.MustCompile("max:(\\d+)")
+
 var ErrIntOutOfList = errors.New("the field value is out of list")
 var ErrIntOutOfRange = errors.New("the field value is out of range")
 var ErrIntTooSmall = errors.New("the field value is too small")
@@ -51,25 +54,30 @@ func Validate(v interface{}) error {
 			continue
 		}
 
+		var validErrors ValidationErrors
+		var err error
+
 		switch field.Type.Kind() {
 		case reflect.Int:
-			err := validateInt(field.Name, int(reflectedStruct.Field(i).Int()), validationRule, &validationErrors)
+			validErrors, err = validateInt(field.Name, int(reflectedStruct.Field(i).Int()), validationRule)
 			if err != nil {
 				return err
 			}
 		case reflect.String:
-			err := validateString(field.Name, reflectedStruct.Field(i).String(), validationRule, &validationErrors)
+			validErrors, err = validateString(field.Name, reflectedStruct.Field(i).String(), validationRule)
 			if err != nil {
 				return err
 			}
 		case reflect.Slice:
-			err := validateSlice(field.Name, reflectedStruct.Field(i), validationRule, &validationErrors)
+			validErrors, err = validateSlice(field.Name, reflectedStruct.Field(i), validationRule)
 			if err != nil {
 				return err
 			}
 		default:
 			return errors.New("unsupported file type")
 		}
+
+		validationErrors = append(validationErrors, validErrors...)
 	}
 
 	if len(validationErrors) > 0 {
@@ -79,33 +87,34 @@ func Validate(v interface{}) error {
 	return nil
 }
 
-func validateSlice(fieldName string, values reflect.Value, rule string, errors *ValidationErrors) error {
-	stringSlice, isStrings := values.Interface().([]string)
-	intSlice, isIntS := values.Interface().([]int)
+func validateSlice(fieldName string, values reflect.Value, rule string) (ValidationErrors, error) {
+	validationErrors := make(ValidationErrors, 0)
 
-	if isStrings {
-		for _, value := range stringSlice {
-			err := validateString(fieldName, value, rule, errors)
+	switch values.Interface().(type) {
+	case []int:
+		for _, value := range values.Interface().([]int) {
+			validationErrors, err := validateInt(fieldName, value, rule)
 			if err != nil {
-				return nil
+				return validationErrors, err
 			}
 		}
-	} else if isIntS {
-		for _, value := range intSlice {
-			err := validateInt(fieldName, value, rule, errors)
+	case []string:
+		for _, value := range values.Interface().([]string) {
+			validationErrors, err := validateString(fieldName, value, rule)
 			if err != nil {
-				return nil
+				return validationErrors, err
 			}
 		}
 	}
 
-	return nil
+	return validationErrors, nil
 }
 
-func validateInt(fieldName string, value int, rule string, errors *ValidationErrors) error {
+func validateInt(fieldName string, value int, rule string) (ValidationErrors, error) {
+	validationErrors := make(ValidationErrors, 0)
 	isValid := false
 
-	isListValidation, _ := regexp.Match("^in:", []byte(rule))
+	isListValidation := strings.HasPrefix(rule, "in:")
 	if isListValidation {
 		isValid = false
 		rule = strings.TrimPrefix(rule, "in:")
@@ -113,7 +122,7 @@ func validateInt(fieldName string, value int, rule string, errors *ValidationErr
 		for _, v := range values {
 			intValue, err := strconv.Atoi(v)
 			if err != nil {
-				return err
+				return validationErrors, err
 			}
 			if value == intValue {
 				isValid = true
@@ -122,12 +131,12 @@ func validateInt(fieldName string, value int, rule string, errors *ValidationErr
 		}
 		if !isValid {
 			validationError := ValidationError{Field: fieldName, Err: ErrIntOutOfList}
-			*errors = append(*errors, validationError)
+			validationErrors = append(validationErrors, validationError)
 		}
 	}
 
-	isMinValidation, _ := regexp.Match("min:(\\d+)", []byte(rule))
-	isMaxValidation, _ := regexp.Match("max:(\\d+)", []byte(rule))
+	isMinValidation := minValueValidationRegexp.Match([]byte(rule))
+	isMaxValidation := maxValueValidationRegexp.Match([]byte(rule))
 	isRangeLengthValidation := isMinValidation && isMaxValidation
 
 	if isRangeLengthValidation {
@@ -136,16 +145,16 @@ func validateInt(fieldName string, value int, rule string, errors *ValidationErr
 		if len(lengthValues) == 2 {
 			minLength, err := strconv.Atoi(lengthValues[0])
 			if err != nil {
-				return err
+				return validationErrors, err
 			}
 			maxLength, err := strconv.Atoi(lengthValues[1])
 			if err != nil {
-				return err
+				return validationErrors, err
 			}
 			isValid = value >= minLength && value <= maxLength
 			if !isValid {
 				validationError := ValidationError{Field: fieldName, Err: ErrIntOutOfRange}
-				*errors = append(*errors, validationError)
+				validationErrors = append(validationErrors, validationError)
 			}
 		}
 	} else if isMinValidation {
@@ -154,12 +163,12 @@ func validateInt(fieldName string, value int, rule string, errors *ValidationErr
 		if len(minValue) == 1 {
 			minLength, err := strconv.Atoi(minValue[0])
 			if err != nil {
-				return err
+				return validationErrors, err
 			}
 			isValid = value >= minLength
 			if !isValid {
 				validationError := ValidationError{Field: fieldName, Err: ErrIntTooSmall}
-				*errors = append(*errors, validationError)
+				validationErrors = append(validationErrors, validationError)
 			}
 		}
 	} else if isMaxValidation {
@@ -168,36 +177,37 @@ func validateInt(fieldName string, value int, rule string, errors *ValidationErr
 		if len(maxValue) == 1 {
 			minLength, err := strconv.Atoi(maxValue[0])
 			if err != nil {
-				return err
+				return validationErrors, err
 			}
 			isValid = value <= minLength
 			if !isValid {
 				validationError := ValidationError{Field: fieldName, Err: ErrIntTooLarge}
-				*errors = append(*errors, validationError)
+				validationErrors = append(validationErrors, validationError)
 			}
 		}
 	}
 
-	return nil
+	return validationErrors, nil
 }
 
-func validateString(fieldName string, value string, rule string, errors *ValidationErrors) error {
+func validateString(fieldName string, value string, rule string) (ValidationErrors, error) {
+	validationErrors := make(ValidationErrors, 0)
 	isValid := false
 
-	isRegexpValidation, _ := regexp.Match("^regexp:", []byte(rule))
+	isRegexpValidation := strings.HasPrefix(rule, "regexp:")
 	if isRegexpValidation {
 		validationPattern := strings.TrimPrefix(rule, "regexp:")
 		isValid, err := regexp.Match(validationPattern, []byte(value))
 		if err != nil {
-			return err
+			return validationErrors, err
 		}
 		if !isValid {
 			validationError := ValidationError{Field: fieldName, Err: ErrStringRegexp}
-			*errors = append(*errors, validationError)
+			validationErrors = append(validationErrors, validationError)
 		}
 	}
 
-	isListValidation, _ := regexp.Match("^in:", []byte(rule))
+	isListValidation := strings.HasPrefix(rule, "in:")
 	if isListValidation {
 		rule = strings.TrimPrefix(rule, "in:")
 		values := strings.Split(rule, ",")
@@ -210,7 +220,7 @@ func validateString(fieldName string, value string, rule string, errors *Validat
 		}
 		if !isValid {
 			validationError := ValidationError{Field: fieldName, Err: ErrStringOutOfList}
-			*errors = append(*errors, validationError)
+			validationErrors = append(validationErrors, validationError)
 		}
 	}
 
@@ -218,14 +228,14 @@ func validateString(fieldName string, value string, rule string, errors *Validat
 	if isLengthValidation {
 		fieldLength, err := strconv.Atoi(strings.TrimPrefix(rule, "len:"))
 		if err != nil {
-			return err
+			return validationErrors, err
 		}
 		isValid = len(value) == fieldLength
 		if !isValid {
 			validationError := ValidationError{Field: fieldName, Err: ErrStringLen}
-			*errors = append(*errors, validationError)
+			validationErrors = append(validationErrors, validationError)
 		}
 	}
 
-	return nil
+	return validationErrors, nil
 }
