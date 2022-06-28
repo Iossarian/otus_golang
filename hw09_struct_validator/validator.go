@@ -224,7 +224,10 @@ func validateString(fieldName string, value string, rule string) (ValidationErro
 		}
 	}
 
-	isLengthValidation, _ := regexp.Match("^len:(\\d+)", []byte(rule))
+	isLengthValidation, err := regexp.Match("^len:(\\d+)", []byte(rule))
+	if err != nil {
+		return validationErrors, err
+	}
 	if isLengthValidation {
 		fieldLength, err := strconv.Atoi(strings.TrimPrefix(rule, "len:"))
 		if err != nil {
