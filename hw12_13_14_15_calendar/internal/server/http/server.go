@@ -2,74 +2,88 @@ package internalhttp
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"github.com/fixme_my_friend/hw12_13_14_15_calendar/internal/storage"
+	"fmt"
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
+	"github.com/gorilla/mux"
 	"net/http"
+	"os"
+	"time"
 )
 
 type Server struct {
 	app    Application
 	logger Logger
 	config Config
-}
-
-/*func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/all" {
-		s.logger.Info(r.RemoteAddr + "[" + time.Now().UTC().String() + "]" + r.Method + r.RequestURI + strconv.Itoa(int(r.ContentLength)) + r.UserAgent())
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-
-		json.NewEncoder(w).Encode(s.app.GetEvents())
-	}
-}*/
-
-func (s *Server) getAll(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-
-	json.NewEncoder(w).Encode(s.app.GetEvents())
+	server *http.Server
 }
 
 type Logger interface {
-	Info(msg string)
-	Error(msg string)
+	Info(err error)
+	Error(err error)
+	LogRequest(r *http.Request, statusCode int, requestDuration time.Duration)
 }
 
 type Application interface {
-	CreateEvent(ctx context.Context, title, date string) error
-	GetEvent(id string) *storage.Event
+	CreateEvent(event storage.Event)
+	EditEvent(id string, e storage.Event)
 	DeleteEvent(id string)
-	GetEvents() map[string]*storage.Event
-	EditEvent(id string, e *storage.Event)
+	SelectForTheDay(date time.Time) map[string]storage.Event
+	SelectForTheWeek(date time.Time) map[string]storage.Event
+	SelectForTheMonth(date time.Time) map[string]storage.Event
 }
 
 type Config interface {
 	GetAddr() string
 }
 
+type loggingMiddleware struct {
+	logger Logger
+}
+
 func NewServer(logger Logger, app Application, config Config) *Server {
-	return &Server{
+	router := mux.NewRouter()
+	httpServer := &http.Server{
+		Addr:    config.GetAddr(),
+		Handler: router,
+	}
+
+	srv := &Server{
 		logger: logger,
 		app:    app,
 		config: config,
+		server: httpServer,
 	}
+
+	router.HandleFunc("/", srv.Hello).Methods("GET")
+	lm := loggingMiddleware{logger: logger}
+	router.Use(lm.Middleware)
+
+	return srv
 }
 
 func (s *Server) Start(ctx context.Context) error {
-	/*server := &http.Server{
-		Addr:    s.config.GetAddr(),
-		Handler: s,
-	}*/
-
-	http.HandleFunc("/all", loggingMiddleware(s.getAll, s))
-	http.ListenAndServe(s.config.GetAddr(), nil)
+	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		s.logger.Error(fmt.Errorf("listen: %s", err))
+		os.Exit(1)
+	}
 	<-ctx.Done()
 
 	return nil
 }
 
 func (s *Server) Stop(ctx context.Context) error {
+	s.logger.Info(fmt.Errorf("calendar is shutting down"))
+	if err := s.server.Shutdown(ctx); err != nil {
+		s.logger.Error(fmt.Errorf("shutdown: %s", err))
+	}
+	<-ctx.Done()
 
-	return errors.New("fail")
+	return nil
+}
+
+func (s *Server) Hello(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if _, err := w.Write([]byte("hello-world")); err != nil {
+		s.logger.Error(err)
+	}
 }

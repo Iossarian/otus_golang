@@ -1,48 +1,42 @@
-package main
+package config
 
 import (
 	"github.com/spf13/viper"
+	"net"
 	"strings"
 )
 
 type Config struct {
-	Logger        LoggerConf
 	Host          string `mapstructure:"HOST"`
 	Port          string `mapstructure:"PORT"`
 	StorageSource string `mapstructure:"STORAGE_SOURCE"`
+	LoggingFile   string `mapstructure:"LOGGING_FILE"`
+	DBUser        string `mapstructure:"DB_USER"`
+	DBPassword    string `mapstructure:"DB_PASSWORD"`
+	DBTable       string `mapstructure:"DB_NAME"`
 }
 
-type LoggerConf struct {
-	Level string `mapstructure:"LOG_LEVEL"`
-}
-
-func NewConfig() Config {
+func NewConfig(configPath string) Config {
 	var config Config
-	readConfig()
+	readConfig(configPath)
 	err := viper.Unmarshal(&config)
 	if err != nil {
 		panic(err)
 	}
-	config.Logger.Level = viper.GetString("LOG_LEVEL")
 
 	return config
 }
 
 func (c Config) GetAddr() string {
-	hostPort := []string{c.Host, c.Port}
-
-	return strings.Join(hostPort, ":")
+	return net.JoinHostPort(c.Host, c.Port)
 }
 
-func readConfig() {
-	viper.AddConfigPath(".")
-	viper.SetConfigName("config")
-	viper.SetConfigType("env")
+func readConfig(configPath string) {
+	viper.SetConfigFile(configPath)
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	err := viper.ReadInConfig()
-	if err != nil {
+	if err := viper.ReadInConfig(); err != nil {
 		panic(err)
 	}
 }

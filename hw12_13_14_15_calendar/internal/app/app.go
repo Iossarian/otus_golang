@@ -2,9 +2,8 @@ package app
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"github.com/fixme_my_friend/hw12_13_14_15_calendar/internal/storage"
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
+	"time"
 )
 
 type App struct {
@@ -13,14 +12,19 @@ type App struct {
 }
 
 type Logger interface {
+	Info(err error)
+	Error(err error)
 }
 
 type Storage interface {
-	Add(s *storage.Event) error
-	Get(id string) (*storage.Event, error)
-	Delete(id string)
-	All() map[string]*storage.Event
-	Edit(id string, e *storage.Event) error
+	Connect(ctx context.Context) error
+	Close() error
+	Create(s storage.Event) error
+	Delete(id string) error
+	Edit(id string, e storage.Event) error
+	SelectForTheDay(date time.Time) (map[string]storage.Event, error)
+	SelectForTheWeek(date time.Time) (map[string]storage.Event, error)
+	SelectForTheMonth(date time.Time) (map[string]storage.Event, error)
 }
 
 func New(logger Logger, storage Storage) *App {
@@ -30,33 +34,46 @@ func New(logger Logger, storage Storage) *App {
 	}
 }
 
-func (a *App) CreateEvent(ctx context.Context, title, date string) error {
-	return a.storage.Add(&storage.Event{Title: title, Date: date})
-}
-
-func (a *App) GetEvent(id string) *storage.Event {
-	event, err := a.storage.Get(id)
-	var eventNotFoundErr *storage.EventNotFoundErr
-	if errors.As(err, &eventNotFoundErr) {
-		fmt.Println(err)
-		return nil
+func (a *App) CreateEvent(event storage.Event) {
+	if err := a.storage.Create(event); err != nil {
+		a.logger.Error(err)
 	}
-
-	return event
 }
 
 func (a *App) DeleteEvent(id string) {
-	a.storage.Delete(id)
-}
-
-func (a *App) GetEvents() map[string]*storage.Event {
-	return a.storage.All()
-}
-
-func (a *App) EditEvent(id string, e *storage.Event) {
-	err := a.storage.Edit(id, e)
-	var eventNotFoundErr *storage.EventNotFoundErr
-	if errors.As(err, &eventNotFoundErr) {
-		fmt.Println(err)
+	if err := a.storage.Delete(id); err != nil {
+		a.logger.Error(err)
 	}
+}
+
+func (a *App) EditEvent(id string, e storage.Event) {
+	if err := a.storage.Edit(id, e); err != nil {
+		a.logger.Error(err)
+	}
+}
+
+func (a *App) SelectForTheDay(date time.Time) map[string]storage.Event {
+	events, err := a.storage.SelectForTheDay(date)
+	if err != nil {
+		a.logger.Error(err)
+	}
+
+	return events
+}
+func (a *App) SelectForTheWeek(date time.Time) map[string]storage.Event {
+	events, err := a.storage.SelectForTheWeek(date)
+	if err != nil {
+		a.logger.Error(err)
+	}
+
+	return events
+}
+
+func (a *App) SelectForTheMonth(date time.Time) map[string]storage.Event {
+	events, err := a.storage.SelectForTheMonth(date)
+	if err != nil {
+		a.logger.Error(err)
+	}
+
+	return events
 }

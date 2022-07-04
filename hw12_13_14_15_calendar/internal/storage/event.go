@@ -1,27 +1,21 @@
 package storage
 
 import (
-	"fmt"
+	"errors"
 	"github.com/google/uuid"
+	"time"
 )
 
-type EventNotFoundErr struct {
-	Id string
-}
-
-func (e EventNotFoundErr) Error() string {
-	return fmt.Sprintf("event %s not found", e.Id)
-}
-
-type EventAlreadyExistErr struct {
-	Id string
-}
-
-func (e EventAlreadyExistErr) Error() string {
-	return fmt.Sprintf("event with id %s not found", e.Id)
-}
+var (
+	ErrDateAlreadyBusy = errors.New("date already busy")
+	ErrEventNotFound   = errors.New("event not exists")
+)
 
 type Event struct {
-	ID                                                       uuid.UUID
-	Title, Date, Duration, Description, NotifyBefore, UserId string
+	ID          uuid.UUID `db:"id"`
+	Title       string    `db:"title"`
+	Description string    `db:"description"`
+	UserID      int       `db:"user_id"`
+	StartDate   time.Time `db:"start_date"`
+	EndDate     time.Time `db:"end_date"`
 }

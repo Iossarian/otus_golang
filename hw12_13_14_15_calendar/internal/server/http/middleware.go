@@ -2,13 +2,28 @@ package internalhttp
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 )
 
-func loggingMiddleware(h http.HandlerFunc, s *Server) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		s.logger.Info(r.RemoteAddr + "[" + time.Now().UTC().String() + "]" + r.Method + r.RequestURI + strconv.Itoa(int(r.ContentLength)) + r.UserAgent())
-		h(w, r)
-	}
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func NewLoggingResponseWriter(w http.ResponseWriter) *loggingResponseWriter {
+	return &loggingResponseWriter{w, http.StatusOK}
+}
+
+func (lrw *loggingResponseWriter) WriteHeader(code int) {
+	lrw.statusCode = code
+	lrw.ResponseWriter.WriteHeader(code)
+}
+
+func (lm *loggingMiddleware) Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		lrw := NewLoggingResponseWriter(w)
+		next.ServeHTTP(w, r)
+		lm.logger.LogRequest(r, lrw.statusCode, time.Since(start))
+	})
 }
