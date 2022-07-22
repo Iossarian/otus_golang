@@ -1,7 +1,47 @@
 syntax = "proto3";
 
 package event;
+option go_package = "./;pb";
+
+service Calendar {
+  rpc Create (CreateRequest) returns (CreateResponse) {}
+  rpc Edit (EditRequest) returns (EditResponse) {}
+  rpc Delete (DeleteRequest) returns (DeleteResponse) {}
+  rpc List (ListRequest) returns (ListResponse) {}
+}
 
 message Event {
-    // TODO
+  string ID = 1;
+  string Title = 2;
+  string Description = 3;
+  int64  UserID = 4;
+  string StartDate = 5;
+  string EndDate = 6;
+}
+
+message CreateRequest {
+  Event event = 1;
+}
+
+message CreateResponse {}
+
+message EditRequest {
+  Event event = 1;
+}
+
+message EditResponse {}
+
+message DeleteRequest {
+    string ID = 1;
+}
+
+message DeleteResponse {}
+
+message ListRequest {
+  string Date = 1;
+  string Duration = 2;
+}
+
+message ListResponse {
+  map<string, Event> list = 1;
 }
