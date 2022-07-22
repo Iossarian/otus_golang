@@ -4,9 +4,14 @@ DOCKER_IMG="calendar:develop"
 GIT_HASH := $(shell git log --format="%h" -n 1)
 LDFLAGS := -X main.release="develop" -X main.buildDate=$(shell date -u +%Y-%m-%dT%H:%M:%S) -X main.gitHash=$(GIT_HASH)
 
-migrate:
+generate:
+	go generate ./...
+
+migrate-up:
 	goose --dir=migrations postgres "postgres://calendar:calendar@localhost:5432/calendar?sslmode=disable" up
 
+migrate-down:
+	goose --dir=migrations postgres "postgres://calendar:calendar@localhost:5432/calendar?sslmode=disable" down
 build:
 	go build -v -o $(BIN) -ldflags "$(LDFLAGS)" ./cmd/calendar
 

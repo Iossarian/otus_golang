@@ -1,27 +1,30 @@
 package logger
 
 import (
-	"fmt"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/config"
-	"io"
-	"log"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
 	"net/http"
 	"os"
 	"time"
 )
 
 type Logger struct {
-	filePath string
+	logger *logrus.Logger
 }
 
-func New(c config.Config) *Logger {
-	return &Logger{
-		filePath: c.LoggingFile,
-	}
+func New(c config.Config, logFile *os.File) *Logger {
+	logger := logrus.New()
+	logLevel, _ := logrus.ParseLevel(c.LogLevel)
+	logger.SetLevel(logLevel)
+	logger.SetOutput(logFile)
+	logger.SetOutput(os.Stdout)
+
+	return &Logger{logger: logger}
 }
 
-func (l *Logger) LogRequest(r *http.Request, statusCode int, requestDuration time.Duration) {
-	l.Info(fmt.Errorf(
+func (l *Logger) LogHTTPRequest(r *http.Request, statusCode int, requestDuration time.Duration) {
+	l.logger.Infof(
 		"%s %s %s %s %s %d %s %s",
 		r.RemoteAddr,
 		time.Now().Format(time.RFC1123Z),
@@ -31,41 +34,24 @@ func (l *Logger) LogRequest(r *http.Request, statusCode int, requestDuration tim
 		statusCode,
 		requestDuration,
 		r.UserAgent(),
-	))
+	)
 }
 
-func (l *Logger) Info(error error) {
-	logFile, err := os.OpenFile(l.filePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	defer func(logFile *os.File) {
-		err := logFile.Close()
-		if err != nil {
-			panic("can not close log file")
-		}
-	}(logFile)
-
-	wrt := io.MultiWriter(os.Stdout, logFile)
-	log.SetOutput(wrt)
-
-	log.Println("Info: " + error.Error())
+func (l *Logger) LogGRPCRequest(code codes.Code, method, address string, requestDuration time.Duration) {
+	l.logger.Infof(
+		"%s %s %s %s %s",
+		code,
+		time.Now().Format(time.RFC1123Z),
+		method,
+		address,
+		requestDuration,
+	)
 }
 
-func (l *Logger) Error(error error) {
-	logFile, err := os.OpenFile(l.filePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	defer func(logFile *os.File) {
-		err := logFile.Close()
-		if err != nil {
-			panic("can not close log file")
-		}
-	}(logFile)
+func (l *Logger) Info(err error) {
+	l.logger.Info(err.Error())
+}
 
-	wrt := io.MultiWriter(os.Stdout, logFile)
-	log.SetOutput(wrt)
-
-	log.Println("Error: " + error.Error())
+func (l *Logger) Error(err error) {
+	l.logger.Error(err.Error())
 }

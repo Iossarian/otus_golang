@@ -16,15 +16,16 @@ type Logger interface {
 	Error(err error)
 }
 
+type Event interface {
+}
+
 type Storage interface {
 	Connect(ctx context.Context) error
 	Close() error
 	Create(s storage.Event) error
 	Delete(id string) error
 	Edit(id string, e storage.Event) error
-	SelectForTheDay(date time.Time) (map[string]storage.Event, error)
-	SelectForTheWeek(date time.Time) (map[string]storage.Event, error)
-	SelectForTheMonth(date time.Time) (map[string]storage.Event, error)
+	List(date time.Time, duration string) (map[string]storage.Event, error)
 }
 
 func New(logger Logger, storage Storage) *App {
@@ -34,43 +35,20 @@ func New(logger Logger, storage Storage) *App {
 	}
 }
 
-func (a *App) CreateEvent(event storage.Event) {
-	if err := a.storage.Create(event); err != nil {
-		a.logger.Error(err)
-	}
+func (a *App) CreateEvent(event storage.Event) error {
+	return a.storage.Create(event)
 }
 
-func (a *App) DeleteEvent(id string) {
-	if err := a.storage.Delete(id); err != nil {
-		a.logger.Error(err)
-	}
+func (a *App) DeleteEvent(id string) error {
+	return a.storage.Delete(id)
 }
 
-func (a *App) EditEvent(id string, e storage.Event) {
-	if err := a.storage.Edit(id, e); err != nil {
-		a.logger.Error(err)
-	}
+func (a *App) EditEvent(id string, e storage.Event) error {
+	return a.storage.Edit(id, e)
 }
 
-func (a *App) SelectForTheDay(date time.Time) map[string]storage.Event {
-	events, err := a.storage.SelectForTheDay(date)
-	if err != nil {
-		a.logger.Error(err)
-	}
-
-	return events
-}
-func (a *App) SelectForTheWeek(date time.Time) map[string]storage.Event {
-	events, err := a.storage.SelectForTheWeek(date)
-	if err != nil {
-		a.logger.Error(err)
-	}
-
-	return events
-}
-
-func (a *App) SelectForTheMonth(date time.Time) map[string]storage.Event {
-	events, err := a.storage.SelectForTheMonth(date)
+func (a *App) List(date time.Time, duration string) map[string]storage.Event {
+	events, err := a.storage.List(date, duration)
 	if err != nil {
 		a.logger.Error(err)
 	}

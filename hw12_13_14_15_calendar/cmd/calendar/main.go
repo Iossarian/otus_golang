@@ -8,19 +8,17 @@ import (
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/app"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/config"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/logger"
-	internalHttp "github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/server/http"
-	memoryStorage "github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage/memory"
-	sqlStorage "github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage/sql"
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/server/grpc"
+	internalhttp "github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/server/http"
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage/factory"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
 )
 
 var configPath string
-
-const memoryStorageName = "memory"
-const sqlStorageName = "sql"
 
 func init() {
 	flag.StringVar(&configPath, "config", "./../../configs/config.env", "Path to configuration file")
@@ -34,10 +32,15 @@ func main() {
 	}
 
 	appConfig := config.NewConfig(configPath)
-	logg := logger.New(appConfig)
+	logFile, _ := os.OpenFile(appConfig.LoggingFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	defer logFile.Close()
+	logg := logger.New(appConfig, logFile)
 
-	storageSource := getStorage(appConfig)
-	err := storageSource.Connect(context.Background())
+	storageSource, err := factory.GetStorage(appConfig)
+	if err != nil {
+		logg.Error(err)
+	}
+	err = storageSource.Connect(context.Background())
 	if err != nil {
 		logg.Error(fmt.Errorf("fail open storage: %w", err))
 	}
@@ -50,15 +53,23 @@ func main() {
 
 	calendar := app.New(logg, storageSource)
 
-	server := internalHttp.NewServer(logg, calendar, appConfig)
+	httpServer := internalhttp.NewServer(logg, calendar, appConfig)
+	grpcServer := grpc.NewServer(logg, calendar, appConfig)
 
 	ctx, cancel := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
 
 	go func() {
-		logg.Info(fmt.Errorf("%s", "calendar is running..."))
-		if err := server.Start(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logg.Info(fmt.Errorf("%s", "http server is running..."))
+		if err := httpServer.Start(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logg.Info(fmt.Errorf("listen: %w", err))
+		}
+	}()
+
+	go func() {
+		logg.Info(fmt.Errorf("%s", "gRPC server is running..."))
+		if err := grpcServer.Start(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logg.Info(fmt.Errorf("listen: %w", err))
 		}
 	}()
@@ -70,18 +81,10 @@ func main() {
 		cancel()
 	}()
 
-	if err := server.Stop(ctx); err != nil {
+	if err := httpServer.Stop(ctx); err != nil {
 		logg.Error(err)
 	}
-}
-
-func getStorage(c config.Config) app.Storage {
-	switch c.StorageSource {
-	case memoryStorageName:
-		return memoryStorage.New()
-	case sqlStorageName:
-		return sqlStorage.New(c)
-	default:
-		return sqlStorage.New(c)
+	if err := grpcServer.Stop(ctx); err != nil {
+		logg.Error(err)
 	}
 }

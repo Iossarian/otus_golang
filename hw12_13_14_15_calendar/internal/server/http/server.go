@@ -2,6 +2,7 @@ package internalhttp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
 	"github.com/gorilla/mux"
@@ -20,20 +21,19 @@ type Server struct {
 type Logger interface {
 	Info(err error)
 	Error(err error)
-	LogRequest(r *http.Request, statusCode int, requestDuration time.Duration)
+	LogHTTPRequest(r *http.Request, statusCode int, requestDuration time.Duration)
 }
 
 type Application interface {
-	CreateEvent(event storage.Event)
-	EditEvent(id string, e storage.Event)
-	DeleteEvent(id string)
-	SelectForTheDay(date time.Time) map[string]storage.Event
-	SelectForTheWeek(date time.Time) map[string]storage.Event
-	SelectForTheMonth(date time.Time) map[string]storage.Event
+	CreateEvent(event storage.Event) error
+	EditEvent(id string, e storage.Event) error
+	DeleteEvent(id string) error
+	List(date time.Time, duration string) map[string]storage.Event
 }
 
 type Config interface {
-	GetAddr() string
+	GetHTTPAddr() string
+	GetGRPCAddr() string
 }
 
 type loggingMiddleware struct {
@@ -43,7 +43,7 @@ type loggingMiddleware struct {
 func NewServer(logger Logger, app Application, config Config) *Server {
 	router := mux.NewRouter()
 	httpServer := &http.Server{
-		Addr:    config.GetAddr(),
+		Addr:    config.GetHTTPAddr(),
 		Handler: router,
 	}
 
@@ -54,7 +54,10 @@ func NewServer(logger Logger, app Application, config Config) *Server {
 		server: httpServer,
 	}
 
-	router.HandleFunc("/", srv.Hello).Methods("GET")
+	router.HandleFunc("/create", srv.Create).Methods("POST")
+	router.HandleFunc("/edit", srv.Edit).Methods("PUT")
+	router.HandleFunc("/delete", srv.Delete).Methods("DELETE")
+	router.HandleFunc("/list", srv.List).Methods("GET")
 	lm := loggingMiddleware{logger: logger}
 	router.Use(lm.Middleware)
 
@@ -63,7 +66,7 @@ func NewServer(logger Logger, app Application, config Config) *Server {
 
 func (s *Server) Start(ctx context.Context) error {
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		s.logger.Error(fmt.Errorf("listen: %s", err))
+		s.logger.Error(fmt.Errorf("listen: %w", err))
 		os.Exit(1)
 	}
 	<-ctx.Done()
@@ -74,16 +77,72 @@ func (s *Server) Start(ctx context.Context) error {
 func (s *Server) Stop(ctx context.Context) error {
 	s.logger.Info(fmt.Errorf("calendar is shutting down"))
 	if err := s.server.Shutdown(ctx); err != nil {
-		s.logger.Error(fmt.Errorf("shutdown: %s", err))
+		s.logger.Error(fmt.Errorf("shutdown: %w", err))
 	}
 	<-ctx.Done()
 
 	return nil
 }
 
-func (s *Server) Hello(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if _, err := w.Write([]byte("hello-world")); err != nil {
-		s.logger.Error(err)
+func (s *Server) Create(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	event := storage.NewEvent()
+	if err := decoder.Decode(&event); err != nil {
+		s.logger.Error(fmt.Errorf("event decoding fail: %w", err))
+	}
+
+	if err := s.app.CreateEvent(*event); err != nil {
+		s.logger.Error(fmt.Errorf("event creation fail: %w", err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) Edit(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	var event storage.Event
+	if err := decoder.Decode(&event); err != nil {
+		s.logger.Error(fmt.Errorf("event decoding fail: %w", err))
+	}
+
+	if err := s.app.EditEvent(event.ID.String(), event); err != nil {
+		s.logger.Error(fmt.Errorf("event edition fail: %w", err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) Delete(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error(fmt.Errorf("fail parse form %w", err))
+	}
+
+	id := r.Form.Get("id")
+	if err := s.app.DeleteEvent(id); err != nil {
+		s.logger.Error(fmt.Errorf("event deleting fail: %w", err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) List(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error(fmt.Errorf("fail parse form %w", err))
+	}
+
+	date := r.Form.Get("date")
+	duration := r.Form.Get("duration")
+	parsedDate, _ := time.Parse(storage.DateLayout, date)
+
+	list := s.app.List(parsedDate, duration)
+	if err := json.NewEncoder(w).Encode(list); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 }

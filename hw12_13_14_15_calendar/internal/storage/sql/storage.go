@@ -109,16 +109,17 @@ func (s *Storage) Edit(eventID string, e storage.Event) error {
 	return err
 }
 
-func (s *Storage) SelectForTheDay(date time.Time) (map[string]storage.Event, error) {
-	return s.SelectBetween(date, date.AddDate(0, 0, 1))
-}
-
-func (s *Storage) SelectForTheWeek(date time.Time) (map[string]storage.Event, error) {
-	return s.SelectBetween(date, date.AddDate(0, 0, 7))
-}
-
-func (s *Storage) SelectForTheMonth(date time.Time) (map[string]storage.Event, error) {
-	return s.SelectBetween(date, date.AddDate(0, 1, 0))
+func (s *Storage) List(date time.Time, duration string) (map[string]storage.Event, error) {
+	switch duration {
+	case storage.DayDuration:
+		return s.SelectBetween(date, date.AddDate(0, 0, 1))
+	case storage.WeekDuration:
+		return s.SelectBetween(date, date.AddDate(0, 0, 7))
+	case storage.MonthDuration:
+		return s.SelectBetween(date, date.AddDate(0, 1, 0))
+	default:
+		return s.SelectBetween(date, date.AddDate(0, 0, 1))
+	}
 }
 
 func (s *Storage) SelectBetween(startDate time.Time, endDate time.Time) (map[string]storage.Event, error) {

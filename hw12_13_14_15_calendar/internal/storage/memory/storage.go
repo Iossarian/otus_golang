@@ -12,17 +12,13 @@ type Storage struct {
 	mu     sync.RWMutex
 }
 
-var instance *Storage = nil
 var events = map[string]storage.Event{}
 
 func New() *Storage {
-	if instance == nil {
-		events = make(map[string]storage.Event)
-		instance = &Storage{}
-		instance.events = events
-	}
+	events = make(map[string]storage.Event)
+	str := &Storage{events: events}
 
-	return instance
+	return str
 }
 
 func (s *Storage) Create(e storage.Event) error {
@@ -30,7 +26,7 @@ func (s *Storage) Create(e storage.Event) error {
 	defer s.mu.Unlock()
 
 	for _, event := range s.events {
-		if event.StartDate.Before(e.StartDate) && event.EndDate.After(e.StartDate) {
+		if event.StartDate.Before(e.StartDate) && event.EndDate.After(e.StartDate) && event.UserID == e.UserID {
 			return storage.ErrDateAlreadyBusy
 		}
 	}
@@ -67,16 +63,17 @@ func (s *Storage) Edit(id string, e storage.Event) error {
 	return nil
 }
 
-func (s *Storage) SelectForTheDay(date time.Time) (map[string]storage.Event, error) {
-	return s.list(date, date.AddDate(0, 0, 1))
-}
-
-func (s *Storage) SelectForTheWeek(date time.Time) (map[string]storage.Event, error) {
-	return s.list(date, date.AddDate(0, 0, 7))
-}
-
-func (s *Storage) SelectForTheMonth(date time.Time) (map[string]storage.Event, error) {
-	return s.list(date, date.AddDate(0, 1, 0))
+func (s *Storage) List(date time.Time, duration string) (map[string]storage.Event, error) {
+	switch duration {
+	case storage.DayDuration:
+		return s.list(date, date.AddDate(0, 0, 1))
+	case storage.WeekDuration:
+		return s.list(date, date.AddDate(0, 0, 7))
+	case storage.MonthDuration:
+		return s.list(date, date.AddDate(0, 1, 0))
+	default:
+		return s.list(date, date.AddDate(0, 0, 1))
+	}
 }
 
 func (s *Storage) list(startDate, endDate time.Time) (map[string]storage.Event, error) {
@@ -96,7 +93,5 @@ func (s *Storage) Connect(_ context.Context) error {
 }
 
 func (s *Storage) Close() error {
-	instance = nil
-
 	return nil
 }

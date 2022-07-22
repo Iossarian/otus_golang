@@ -8,12 +8,14 @@ import (
 
 type Config struct {
 	Host          string `mapstructure:"HOST"`
-	Port          string `mapstructure:"PORT"`
+	HTTPPort      string `mapstructure:"HTTP_PORT"`
+	GrpcPort      string `mapstructure:"GRPC_PORT"`
 	StorageSource string `mapstructure:"STORAGE_SOURCE"`
 	LoggingFile   string `mapstructure:"LOGGING_FILE"`
 	DBUser        string `mapstructure:"DB_USER"`
 	DBPassword    string `mapstructure:"DB_PASSWORD"`
 	DBTable       string `mapstructure:"DB_NAME"`
+	LogLevel      string `mapstructure:"LOG_LEVEL"`
 }
 
 func NewConfig(configPath string) Config {
@@ -27,8 +29,12 @@ func NewConfig(configPath string) Config {
 	return config
 }
 
-func (c Config) GetAddr() string {
-	return net.JoinHostPort(c.Host, c.Port)
+func (c Config) GetHTTPAddr() string {
+	return net.JoinHostPort(c.Host, c.HTTPPort)
+}
+
+func (c Config) GetGRPCAddr() string {
+	return net.JoinHostPort(c.Host, c.GrpcPort)
 }
 
 func readConfig(configPath string) {
