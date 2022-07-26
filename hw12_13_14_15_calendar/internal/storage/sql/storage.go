@@ -47,9 +47,9 @@ func (s *Storage) Close() error {
 func (s *Storage) Create(e storage.Event) error {
 	query := `
 				INSERT INTO events 
-					(id, user_id, title, description, start_date, end_date)
+					(id, user_id, title, description, start_date, end_date, notification_date)
 				VALUES
-					($1, $2, $3, $4, $5, $6)
+					($1, $2, $3, $4, $5, $6, $7)
 				;
 	`
 
@@ -62,6 +62,7 @@ func (s *Storage) Create(e storage.Event) error {
 		e.Description,
 		e.StartDate,
 		e.EndDate,
+		e.NotifyDate,
 	)
 
 	return err
@@ -90,7 +91,8 @@ func (s *Storage) Edit(eventID string, e storage.Event) error {
 					title = $3,
 					description = $4, 
 					start_date = $5, 
-					end_date = $6
+					end_date = $6,
+					notification_date = $7
 				WHERE 
 					id = $1
 
@@ -104,6 +106,7 @@ func (s *Storage) Edit(eventID string, e storage.Event) error {
 		e.Description,
 		e.StartDate,
 		e.EndDate,
+		e.NotifyDate,
 	)
 
 	return err
@@ -130,7 +133,8 @@ func (s *Storage) SelectBetween(startDate time.Time, endDate time.Time) (map[str
 		 description,
 		 start_date,
 		 end_date,
-		 user_id
+		 user_id,
+		 notification_date
 		FROM
 		  events
 		WHERE
@@ -158,4 +162,84 @@ func (s *Storage) SelectBetween(startDate time.Time, endDate time.Time) (map[str
 	}
 
 	return events, nil
+}
+
+func (s *Storage) GetByNotificationPeriod(startDate, endDate time.Time) (map[string]storage.Event, error) {
+	sql := `
+		SELECT
+		 id,
+		 title,
+		 description,
+		 start_date,
+		 end_date,
+		 user_id,
+		 notification_date
+		FROM
+		  events
+		WHERE
+		  is_notified = 0
+		AND
+		  notification_date BETWEEN $1 AND $2
+		;
+	`
+	rows, err := s.db.QueryxContext(s.ctx, sql, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := make(map[string]storage.Event, 0)
+	for rows.Next() {
+		var event storage.Event
+		err := rows.StructScan(&event)
+		if err != nil {
+			return nil, err
+		}
+		events[event.ID.String()] = event
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
+func (s *Storage) ChangeNotifyStatus(eventID string) error {
+	query := `
+				UPDATE 
+					events 
+				SET
+					is_notified = 1
+				WHERE 
+					id = $1
+
+	`
+	_, err := s.db.ExecContext(
+		s.ctx,
+		query,
+		eventID,
+	)
+
+	return err
+}
+
+func (s *Storage) DeleteOldNotifiedEvents() error {
+	query := `
+				DELETE FROM 
+					events 
+				WHERE 
+					is_notified = 1
+				AND 
+				    end_date <= $1
+
+	`
+	fmt.Println(time.Now().AddDate(-1, 0, 0))
+	_, err := s.db.ExecContext(
+		s.ctx,
+		query,
+		time.Now().AddDate(-1, 0, 0),
+	)
+
+	return err
 }

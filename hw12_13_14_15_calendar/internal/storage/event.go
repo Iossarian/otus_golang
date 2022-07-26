@@ -27,11 +27,14 @@ type Event struct {
 	UserID      int64     `db:"user_id"`
 	StartDate   time.Time `db:"start_date"`
 	EndDate     time.Time `db:"end_date"`
+	NotifyDate  time.Time `db:"notification_date"`
+	IsNotified  int8      `db:"is_notified"`
 }
 
 func NewEvent() *Event {
 	event := new(Event)
 	event.ID = uuid.New()
+	event.IsNotified = 0
 
 	return event
 }

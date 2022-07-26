@@ -26,6 +26,9 @@ type Storage interface {
 	Delete(id string) error
 	Edit(id string, e storage.Event) error
 	List(date time.Time, duration string) (map[string]storage.Event, error)
+	GetByNotificationPeriod(startDate, endDate time.Time) (map[string]storage.Event, error)
+	ChangeNotifyStatus(eventID string) error
+	DeleteOldNotifiedEvents() error
 }
 
 func New(logger Logger, storage Storage) *App {

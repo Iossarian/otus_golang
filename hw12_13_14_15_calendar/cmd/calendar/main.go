@@ -21,7 +21,7 @@ import (
 var configPath string
 
 func init() {
-	flag.StringVar(&configPath, "config", "./../../configs/config.env", "Path to configuration file")
+	flag.StringVar(&configPath, "config", "./../../configs/api_config.env", "Path to configuration file")
 }
 
 func main() {
@@ -31,7 +31,7 @@ func main() {
 		return
 	}
 
-	appConfig := config.NewConfig(configPath)
+	appConfig := config.New(configPath)
 	logFile, _ := os.OpenFile(appConfig.LoggingFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	defer logFile.Close()
 	logg := logger.New(appConfig, logFile)

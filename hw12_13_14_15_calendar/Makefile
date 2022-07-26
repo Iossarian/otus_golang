@@ -1,4 +1,6 @@
-BIN := "./bin/calendar"
+CALENDAR_BIN := "./bin/calendar"
+SCHEDULER_BIN := "./bin/sheduler"
+SENDER_BIN := "./bin/sender"
 DOCKER_IMG="calendar:develop"
 
 GIT_HASH := $(shell git log --format="%h" -n 1)
@@ -12,11 +14,28 @@ migrate-up:
 
 migrate-down:
 	goose --dir=migrations postgres "postgres://calendar:calendar@localhost:5432/calendar?sslmode=disable" down
-build:
-	go build -v -o $(BIN) -ldflags "$(LDFLAGS)" ./cmd/calendar
 
-run: build
-	$(BIN) -config ./configs/config.env
+
+build-calendar:
+	go build -v -o $(CALENDAR_BIN) -ldflags "$(LDFLAGS)" ./cmd/calendar
+
+build-scheduler:
+	go build -v -o $(SCHEDULER_BIN) -ldflags "$(LDFLAGS)" ./cmd/scheduler
+
+build-sender:
+	go build -v -o $(SENDER_BIN) -ldflags "$(LDFLAGS)" ./cmd/sender
+
+build: build-calendar build-scheduler build-sender
+
+run-calendar: build-calendar
+	$(CALENDAR_BIN) -config ./configs/api_config.env
+
+run-scheduler: build-scheduler
+	$(SCHEDULER_BIN) -config ./configs/scheduler_config.env
+
+run-sender: build-sender
+	$(SENDER_BIN) -config ./configs/sender_config.env
+
 
 build-img:
 	docker build \

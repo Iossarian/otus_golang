@@ -88,10 +88,43 @@ func (s *Storage) list(startDate, endDate time.Time) (map[string]storage.Event, 
 	return list, nil
 }
 
+func (s *Storage) GetByNotificationPeriod(startDate, endDate time.Time) (map[string]storage.Event, error) {
+	events, _ := s.list(startDate, endDate)
+
+	resultMap := make(map[string]storage.Event, 0)
+	for id, event := range events {
+		if event.IsNotified == 0 {
+			resultMap[id] = event
+		}
+	}
+
+	return resultMap, nil
+}
+
+func (s *Storage) ChangeNotifyStatus(eventID string) error {
+	for _, event := range s.events {
+		if event.ID.String() == eventID {
+			event.IsNotified = 1
+		}
+	}
+
+	return nil
+}
+
 func (s *Storage) Connect(_ context.Context) error {
 	return nil
 }
 
 func (s *Storage) Close() error {
+	return nil
+}
+
+func (s *Storage) DeleteOldNotifiedEvents() error {
+	for id, event := range s.events {
+		if event.EndDate.After(time.Now().AddDate(-1, 0, 0)) {
+			delete(s.events, id)
+		}
+	}
+
 	return nil
 }
