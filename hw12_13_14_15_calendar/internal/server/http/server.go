@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
-	"github.com/gorilla/mux"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
+	"github.com/gorilla/mux"
 )
 
 type Server struct {
@@ -25,7 +26,7 @@ type Logger interface {
 }
 
 type Application interface {
-	CreateEvent(event storage.Event) error
+	CreateEvent(event storage.Event) (id string, err error)
 	EditEvent(id string, e storage.Event) error
 	DeleteEvent(id string) error
 	List(date time.Time, duration string) map[string]storage.Event
@@ -43,8 +44,9 @@ type loggingMiddleware struct {
 func NewServer(logger Logger, app Application, config Config) *Server {
 	router := mux.NewRouter()
 	httpServer := &http.Server{
-		Addr:    config.GetHTTPAddr(),
-		Handler: router,
+		Addr:              config.GetHTTPAddr(),
+		Handler:           router,
+		ReadHeaderTimeout: time.Second * 10,
 	}
 
 	srv := &Server{
@@ -91,9 +93,15 @@ func (s *Server) Create(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error(fmt.Errorf("event decoding fail: %w", err))
 	}
 
-	if err := s.app.CreateEvent(*event); err != nil {
+	id, err := s.app.CreateEvent(*event)
+	if err != nil {
 		s.logger.Error(fmt.Errorf("event creation fail: %w", err))
 		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(id); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 

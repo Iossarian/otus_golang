@@ -1,0 +1,14 @@
+version: "3.7"
+
+services:
+  calendar_tests:
+    build:
+      context: ../
+      dockerfile: ./build/Tests.Dockerfile
+    networks:
+      - calendar_test_net
+
+networks:
+  calendar_test_net:
+    external:
+      name: calendar_network

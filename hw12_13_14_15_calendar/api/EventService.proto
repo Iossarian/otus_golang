@@ -3,6 +3,8 @@ syntax = "proto3";
 package event;
 option go_package = "./;pb";
 
+import "google/protobuf/timestamp.proto";
+
 service Calendar {
   rpc Create (CreateRequest) returns (CreateResponse) {}
   rpc Edit (EditRequest) returns (EditResponse) {}
@@ -15,24 +17,29 @@ message Event {
   string Title = 2;
   string Description = 3;
   int64  UserID = 4;
-  string StartDate = 5;
-  string EndDate = 6;
+  google.protobuf.Timestamp StartDate = 5;
+  google.protobuf.Timestamp EndDate = 6;
+  google.protobuf.Timestamp NotificationDate = 7;
 }
 
 message CreateRequest {
   Event event = 1;
 }
 
-message CreateResponse {}
+message CreateResponse {
+  string ID = 1;
+}
 
 message EditRequest {
   Event event = 1;
 }
 
-message EditResponse {}
+message EditResponse {
+  Event event = 1;
+}
 
 message DeleteRequest {
-    string ID = 1;
+  string ID = 1;
 }
 
 message DeleteResponse {}

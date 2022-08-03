@@ -5,23 +5,25 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/app"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/config"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/logger"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/server/grpc"
 	internalhttp "github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/server/http"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage/factory"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
+	_ "github.com/lib/pq"
 )
 
 var configPath string
 
 func init() {
-	flag.StringVar(&configPath, "config", "./../../configs/api_config.env", "Path to configuration file")
+	flag.StringVar(&configPath, "config", "./../../configs/calendar_config.yml", "Path to configuration file")
 }
 
 func main() {
@@ -32,7 +34,7 @@ func main() {
 	}
 
 	appConfig := config.New(configPath)
-	logFile, _ := os.OpenFile(appConfig.LoggingFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	logFile, _ := os.OpenFile(appConfig.Logger.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	defer logFile.Close()
 	logg := logger.New(appConfig, logFile)
 

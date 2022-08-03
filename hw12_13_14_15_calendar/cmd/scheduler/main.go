@@ -4,28 +4,30 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/app"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/config"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/logger"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/rabbitmq"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/scheduler"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage/factory"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
+	_ "github.com/lib/pq"
 )
 
 var configPath string
 
 func init() {
-	flag.StringVar(&configPath, "config", "./../../configs/scheduler_config.env", "Path to configuration file")
+	flag.StringVar(&configPath, "config", "./../../configs/scheduler_config.yml", "Path to configuration file")
 }
 
 func main() {
 	flag.Parse()
 	appConfig := config.New(configPath)
-	logFile, _ := os.OpenFile(appConfig.LoggingFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	logFile, _ := os.OpenFile(appConfig.Logger.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	defer logFile.Close()
 	applogger := logger.New(appConfig, logFile)
 
@@ -48,7 +50,7 @@ func main() {
 		syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
 
-	queue, err := rabbitmq.NewConnection(appConfig, applogger)
+	queue, _ := rabbitmq.NewConnection(appConfig, applogger)
 	appScheduler := scheduler.New(appConfig, storageSource, applogger, queue)
 	go func() {
 		applogger.Info(fmt.Errorf("%s", "sheduler is running..."))

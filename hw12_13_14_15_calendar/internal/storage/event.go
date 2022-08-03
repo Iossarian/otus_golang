@@ -2,14 +2,17 @@ package storage
 
 import (
 	"errors"
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
-const DateLayout = "2006-01-02"
-const DayDuration = "day"
-const WeekDuration = "week"
-const MonthDuration = "month"
+const (
+	DateLayout    = "2006-01-02"
+	DayDuration   = "day"
+	WeekDuration  = "week"
+	MonthDuration = "month"
+)
 
 var (
 	ErrDateAlreadyBusy = errors.New("date already busy")

@@ -2,17 +2,21 @@ package grpc
 
 import (
 	context "context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/server/grpc/pb"
-	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"net"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/server/grpc/pb"
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
+	"github.com/google/uuid"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Server struct {
@@ -30,7 +34,7 @@ type Logger interface {
 }
 
 type Application interface {
-	CreateEvent(event storage.Event) error
+	CreateEvent(event storage.Event) (id string, err error)
 	EditEvent(id string, e storage.Event) error
 	DeleteEvent(id string) error
 	List(date time.Time, duration string) map[string]storage.Event
@@ -76,6 +80,7 @@ func (s *Server) Start(ctx context.Context) error {
 		s.logger.Error(fmt.Errorf("fail start gprc server: %w", err))
 	}
 
+	reflection.Register(s.server)
 	if err := s.server.Serve(lsn); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		s.logger.Error(fmt.Errorf("listen: %w", err))
 		os.Exit(1)
@@ -94,44 +99,40 @@ func (s *Server) Stop(ctx context.Context) error {
 }
 
 func (s *CalendarService) Create(_ context.Context, in *pb.CreateRequest) (*pb.CreateResponse, error) {
-	encodedEvent, _ := json.Marshal(in.Event)
-	event := storage.NewEvent()
-	event.UserID = in.Event.GetUserID()
-	event.Title = in.Event.GetTitle()
-	event.Description = in.Event.GetDescription()
-	event.StartDate, _ = time.Parse(time.RFC3339, in.Event.GetStartDate())
-	event.EndDate, _ = time.Parse(time.RFC3339, in.Event.GetEndDate())
-	if err := json.Unmarshal(encodedEvent, event); err != nil {
-		return nil, err
-	}
-
-	if err := s.app.CreateEvent(*event); err != nil {
+	id, err := s.app.CreateEvent(convertToEvent(in.GetEvent()))
+	if err != nil {
 		s.logger.Error(fmt.Errorf("fail create event %w ", err))
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	return &pb.CreateResponse{}, nil
+	return &pb.CreateResponse{ID: id}, nil
 }
 
 func (s *CalendarService) Edit(_ context.Context, in *pb.EditRequest) (*pb.EditResponse, error) {
-	encodedEvent, _ := json.Marshal(in.Event)
-	var event storage.Event
-	if err := json.Unmarshal(encodedEvent, &event); err != nil {
-		return nil, err
+	pbEvent := in.GetEvent()
+	eventUUID, _ := uuid.FromBytes([]byte(pbEvent.GetID()))
+	event := storage.Event{
+		ID:          eventUUID,
+		Title:       pbEvent.GetTitle(),
+		Description: pbEvent.GetDescription(),
+		StartDate:   pbEvent.GetStartDate().AsTime(),
+		EndDate:     pbEvent.GetEndDate().AsTime(),
+		NotifyDate:  pbEvent.GetNotificationDate().AsTime(),
+		UserID:      pbEvent.GetUserID(),
 	}
 
 	if err := s.app.EditEvent(event.ID.String(), event); err != nil {
 		s.logger.Error(fmt.Errorf("event edition fail: %w", err))
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	return &pb.EditResponse{}, nil
+	return &pb.EditResponse{Event: convertToPbEvent(event)}, nil
 }
 
 func (s *CalendarService) Delete(_ context.Context, in *pb.DeleteRequest) (*pb.DeleteResponse, error) {
 	if err := s.app.DeleteEvent(in.ID); err != nil {
 		s.logger.Error(fmt.Errorf("event deleting fail: %w", err))
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	return &pb.DeleteResponse{}, nil
@@ -148,10 +149,34 @@ func (s *CalendarService) List(_ context.Context, in *pb.ListRequest) (*pb.ListR
 			UserID:      event.UserID,
 			Title:       event.Title,
 			Description: event.Description,
-			StartDate:   event.StartDate.Format(storage.DateLayout),
-			EndDate:     event.EndDate.Format(storage.DateLayout),
+			StartDate:   timestamppb.New(event.StartDate),
+			EndDate:     timestamppb.New(event.EndDate),
 		}
 	}
-	fmt.Println("result is ", result)
+
 	return &pb.ListResponse{List: result}, nil
+}
+
+func convertToPbEvent(e storage.Event) *pb.Event {
+	return &pb.Event{
+		ID:               e.ID.String(),
+		Title:            e.Title,
+		Description:      e.Description,
+		StartDate:        timestamppb.New(e.StartDate),
+		EndDate:          timestamppb.New(e.EndDate),
+		NotificationDate: timestamppb.New(e.NotifyDate),
+		UserID:           e.UserID,
+	}
+}
+
+func convertToEvent(e *pb.Event) storage.Event {
+	event := storage.NewEvent()
+	event.UserID = e.GetUserID()
+	event.Title = e.GetTitle()
+	event.Description = e.GetDescription()
+	event.StartDate = e.GetStartDate().AsTime()
+	event.EndDate = e.GetEndDate().AsTime()
+	event.NotifyDate = e.GetNotificationDate().AsTime()
+
+	return *event
 }

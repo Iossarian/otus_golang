@@ -1,0 +1,15 @@
+logger:
+  level: info
+  file: ./logs/api.txt
+
+db:
+  connectionAddr: user=calendar password=calendar dbname=calendar sslmode=disable sslmode=disable host=calendar_db port=5432
+
+amqp:
+  addr: amqp://guest:guest@calendar_rabbitmq:5672
+  name: event_queue
+  handlersCount: 5
+  eventScanTimeout: 10s
+
+
+storageSource: sql

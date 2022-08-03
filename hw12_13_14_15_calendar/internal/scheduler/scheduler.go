@@ -3,10 +3,10 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/app"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/config"
-	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
-	"time"
 )
 
 type Queue interface {
@@ -21,9 +21,9 @@ type Scheduler struct {
 	queue   Queue
 }
 
-func New(config config.Config, storage app.Storage, logger app.Logger, queue Queue) *Scheduler {
+func New(config *config.Config, storage app.Storage, logger app.Logger, queue Queue) *Scheduler {
 	return &Scheduler{
-		timeout: config.EventScanTimeout,
+		timeout: config.AMQP.EventScanTimeout,
 		storage: storage,
 		logger:  logger,
 		queue:   queue,
@@ -63,13 +63,6 @@ func (s *Scheduler) notify() {
 	}
 
 	s.logger.Info(fmt.Errorf("found %d events to notify", len(events)))
-
-	newEvent := storage.NewEvent()
-	newEvent.Title = "New event"
-	err = s.queue.Publish(newEvent)
-	if err != nil {
-		println(err)
-	}
 
 	for _, event := range events {
 		if err := s.queue.Publish(event); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/app"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/rabbitmq"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"

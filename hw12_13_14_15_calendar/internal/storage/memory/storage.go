@@ -2,9 +2,10 @@ package memorystorage
 
 import (
 	"context"
-	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
 	"sync"
 	"time"
+
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
 )
 
 type Storage struct {
@@ -21,19 +22,19 @@ func New() *Storage {
 	return str
 }
 
-func (s *Storage) Create(e storage.Event) error {
+func (s *Storage) Create(e storage.Event) (id string, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	for _, event := range s.events {
 		if event.StartDate.Before(e.StartDate) && event.EndDate.After(e.StartDate) && event.UserID == e.UserID {
-			return storage.ErrDateAlreadyBusy
+			return e.ID.String(), storage.ErrDateAlreadyBusy
 		}
 	}
 
 	s.events[e.ID.String()] = e
 
-	return nil
+	return e.ID.String(), nil
 }
 
 func (s *Storage) Delete(id string) error {

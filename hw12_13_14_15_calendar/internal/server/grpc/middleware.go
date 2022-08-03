@@ -2,17 +2,15 @@ package grpc
 
 import (
 	"context"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/peer"
-	"google.golang.org/grpc/status"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 )
 
-var (
-	ErrPeerFromContext = status.Error(codes.Internal, "getting peer fail")
-)
+var ErrPeerFromContext = status.Error(codes.Internal, "getting peer fail")
 
 func LoggingInterceptor(logger Logger) grpc.UnaryServerInterceptor {
 	return func(

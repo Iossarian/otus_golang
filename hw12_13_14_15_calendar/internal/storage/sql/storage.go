@@ -3,11 +3,11 @@ package sqlstorage
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/config"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
-	"time"
 )
 
 type Storage struct {
@@ -16,11 +16,9 @@ type Storage struct {
 	ctx context.Context
 }
 
-func New(c config.Config) *Storage {
-	dsn := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable sslmode=disable", c.DBUser, c.DBPassword, c.DBTable)
-
+func New(c *config.Config) *Storage {
 	return &Storage{
-		dsn: dsn,
+		dsn: c.DB.ConnectionAddr,
 	}
 }
 
@@ -44,7 +42,7 @@ func (s *Storage) Close() error {
 	return nil
 }
 
-func (s *Storage) Create(e storage.Event) error {
+func (s *Storage) Create(e storage.Event) (id string, err error) {
 	query := `
 				INSERT INTO events 
 					(id, user_id, title, description, start_date, end_date, notification_date)
@@ -53,7 +51,7 @@ func (s *Storage) Create(e storage.Event) error {
 				;
 	`
 
-	_, err := s.db.ExecContext(
+	_, err = s.db.ExecContext(
 		s.ctx,
 		query,
 		e.ID,
@@ -65,7 +63,7 @@ func (s *Storage) Create(e storage.Event) error {
 		e.NotifyDate,
 	)
 
-	return err
+	return e.ID.String(), err
 }
 
 func (s *Storage) Delete(id string) error {

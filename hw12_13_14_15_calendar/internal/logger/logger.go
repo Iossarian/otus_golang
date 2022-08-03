@@ -1,21 +1,22 @@
 package logger
 
 import (
-	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/config"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/codes"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/config"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
 )
 
 type Logger struct {
 	logger *logrus.Logger
 }
 
-func New(c config.Config, logFile *os.File) *Logger {
+func New(c *config.Config, logFile *os.File) *Logger {
 	logger := logrus.New()
-	logLevel, _ := logrus.ParseLevel(c.LogLevel)
+	logLevel, _ := logrus.ParseLevel(c.Logger.Level)
 	logger.SetLevel(logLevel)
 	logger.SetOutput(logFile)
 	logger.SetOutput(os.Stdout)

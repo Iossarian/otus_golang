@@ -1,55 +1,62 @@
 package config
 
 import (
-	"github.com/spf13/viper"
+	"fmt"
 	"net"
-	"strings"
 	"time"
+
+	yaml "gopkg.in/yaml.v3"
+	"os"
 )
 
 type Config struct {
-	Host                     string        `mapstructure:"HOST"`
-	HTTPPort                 string        `mapstructure:"HTTP_PORT"`
-	GrpcPort                 string        `mapstructure:"GRPC_PORT"`
-	StorageSource            string        `mapstructure:"STORAGE_SOURCE"`
-	LoggingFile              string        `mapstructure:"LOGGING_FILE"`
-	DBUser                   string        `mapstructure:"DB_USER"`
-	DBPassword               string        `mapstructure:"DB_PASSWORD"`
-	DBTable                  string        `mapstructure:"DB_NAME"`
-	LogLevel                 string        `mapstructure:"LOG_LEVEL"`
-	EventScanTimeout         time.Duration `mapstructure:"EVENT_SCAN_TIMEOUT"`
-	AMQPAddress              string        `mapstructure:"AMQP_ADDRESS"`
-	AMQPQueueName            string        `mapstructure:"AMQP_QUEUE_NAME"`
-	AMQPHandlersCount        int           `mapstructure:"AMQP_HANDLERS_COUNT"`
-	AMQPMaxReconnectionTries int           `mapstructure:"AMQP_MAX_RECONNECT_TRIES"`
-	AMQPReconnectTimeout     time.Duration `mapstructure:"AMQP_RECONNECT_TIMEOUT"`
+	HTTP struct {
+		Host string `yaml:"host"`
+		Port string `yaml:"port"`
+	} `yaml:"http"`
+
+	GRPC struct {
+		Host string `yaml:"host"`
+		Port string `yaml:"port"`
+	} `yaml:"grpc"`
+
+	Logger struct {
+		Level string `yaml:"level"`
+		File  string `yaml:"file"`
+	} `yaml:"logger"`
+
+	DB struct {
+		ConnectionAddr string `yaml:"connectionAddr"`
+	} `yaml:"db"`
+
+	AMQP struct {
+		Addr             string        `yaml:"addr"`
+		Name             string        `yaml:"name"`
+		HandlersCount    int           `yaml:"handlersCount"`
+		EventScanTimeout time.Duration `yaml:"eventScanTimeout"`
+	} `yaml:"amqp"`
+
+	StorageSource string `yaml:"storageSource"`
 }
 
-func New(configPath string) Config {
-	var config Config
-	readConfig(configPath)
-	err := viper.Unmarshal(&config)
+func New(configPath string) *Config {
+	f, err := os.ReadFile(configPath)
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("fail to open config fail: %w", err))
+	}
+
+	config := &Config{}
+	if err := yaml.Unmarshal(f, config); err != nil {
+		fmt.Println(fmt.Errorf("fail to decode config file: %w", err))
 	}
 
 	return config
 }
 
 func (c Config) GetHTTPAddr() string {
-	return net.JoinHostPort(c.Host, c.HTTPPort)
+	return net.JoinHostPort(c.HTTP.Host, c.HTTP.Port)
 }
 
 func (c Config) GetGRPCAddr() string {
-	return net.JoinHostPort(c.Host, c.GrpcPort)
-}
-
-func readConfig(configPath string) {
-	viper.SetConfigFile(configPath)
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	if err := viper.ReadInConfig(); err != nil {
-		panic(err)
-	}
+	return net.JoinHostPort(c.GRPC.Host, c.GRPC.Port)
 }

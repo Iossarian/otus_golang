@@ -2,8 +2,9 @@ package app
 
 import (
 	"context"
-	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
 	"time"
+
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
 )
 
 type App struct {
@@ -16,13 +17,12 @@ type Logger interface {
 	Error(err error)
 }
 
-type Event interface {
-}
+type Event interface{}
 
 type Storage interface {
 	Connect(ctx context.Context) error
 	Close() error
-	Create(s storage.Event) error
+	Create(s storage.Event) (id string, err error)
 	Delete(id string) error
 	Edit(id string, e storage.Event) error
 	List(date time.Time, duration string) (map[string]storage.Event, error)
@@ -38,7 +38,7 @@ func New(logger Logger, storage Storage) *App {
 	}
 }
 
-func (a *App) CreateEvent(event storage.Event) error {
+func (a *App) CreateEvent(event storage.Event) (id string, err error) {
 	return a.storage.Create(event)
 }
 

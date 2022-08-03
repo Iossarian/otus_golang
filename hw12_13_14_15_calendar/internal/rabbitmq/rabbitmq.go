@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/app"
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/config"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -20,16 +21,16 @@ type Rabbit struct {
 
 type HandleFunc func(context.Context, <-chan amqp.Delivery)
 
-func New(config config.Config, logger app.Logger) *Rabbit {
+func New(config *config.Config, logger app.Logger) *Rabbit {
 	return &Rabbit{
-		addr:          config.AMQPAddress,
-		queueName:     config.AMQPQueueName,
-		handlersCount: config.AMQPHandlersCount,
+		addr:          config.AMQP.Addr,
+		queueName:     config.AMQP.Name,
+		handlersCount: config.AMQP.HandlersCount,
 		logger:        logger,
 	}
 }
 
-func NewConnection(config config.Config, logger app.Logger) (*Rabbit, error) {
+func NewConnection(config *config.Config, logger app.Logger) (*Rabbit, error) {
 	rabbit := New(config, logger)
 
 	var err error

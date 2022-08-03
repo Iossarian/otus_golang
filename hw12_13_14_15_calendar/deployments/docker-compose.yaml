@@ -1,7 +1,7 @@
 version: "3.7"
 
 services:
-   calendar_db:
+  calendar_db:
     container_name: calendar-db
     image: postgres:14-alpine
     environment:
@@ -14,26 +14,60 @@ services:
       - postgres:/var/lib/postgresql/data
     restart: always
 
-   calendar_scheduler:
-     build:
-       context: ../
-       dockerfile: ./build/Scheduler.Dockerfile
-     restart: always
-     depends_on:
-       - calendar_db
-       - calendar_rabbitmq
+  calendar_migrations:
+    container_name: calendar_migrations
+    restart: on-failure
+    build:
+      context: ../
+      dockerfile: ./build/Migrations.Dockerfile
+    depends_on:
+      - calendar_db
 
-   calendar_rabbitmq:
-     container_name: calendar_rabbitmq
-     image: rabbitmq:3-management-alpine
-     restart: always
-     volumes:
-       - ./rabbitmq/data:/var/lib/rabbitmq/mnesia/rabbit@my-rabbit
-       - ./rabbitmq/logs:/var/log/rabbitmq/log
-     ports:
-       - ${RABBIT_ADMIN_PORT}:15672
-       - ${RABBIT_PORT}:5672
+
+  calendar_api:
+    build:
+      context: ../
+      dockerfile: ./build/Calendar.Dockerfile
+    restart: always
+    ports:
+      - ${HTTP_PORT}:8888
+      - ${GRPC_PORT}:50051
+    depends_on:
+      - calendar_db
+
+  calendar_scheduler:
+    build:
+      context: ../
+      dockerfile: ./build/Scheduler.Dockerfile
+    restart: always
+    depends_on:
+      - calendar_db
+      - calendar_rabbitmq
+
+  calendar_sender:
+    build:
+      context: ../
+      dockerfile: ./build/Sender.Dockerfile
+    restart: always
+    depends_on:
+      - calendar_db
+      - calendar_rabbitmq
+
+  calendar_rabbitmq:
+    container_name: calendar_rabbitmq
+    image: rabbitmq:3-management-alpine
+    restart: always
+    volumes:
+      - ./rabbitmq/data:/var/lib/rabbitmq/mnesia/rabbit@my-rabbit
+      - ./rabbitmq/logs:/var/log/rabbitmq/log
+    ports:
+      - ${RABBIT_ADMIN_PORT}:15672
+      - ${RABBIT_PORT}:5672
 
 volumes:
   postgres:
     driver: local
+
+networks:
+  default:
+    name: calendar_network

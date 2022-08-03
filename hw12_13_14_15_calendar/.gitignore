@@ -1,6 +1,3 @@
 logs/
 bin/
-configs/api_config.env
-configs/scheduler_config.env
-configs/sender_config.env
 deployments/.env

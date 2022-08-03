@@ -2,25 +2,26 @@ package memorystorage
 
 import (
 	"errors"
+	"testing"
+	"time"
+
 	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestStorage(t *testing.T) {
 	memoryStorage := New()
 	dentistEvent := initDentistEvent()
 	eventID := dentistEvent.ID.String()
-	err := memoryStorage.Create(dentistEvent)
+	_, err := memoryStorage.Create(dentistEvent)
 	require.NoError(t, err)
 
 	t.Run("create", func(t *testing.T) {
 		require.Len(t, memoryStorage.events, 1)
 
 		deliveryEvent := initDeliveryEvent()
-		err := memoryStorage.Create(deliveryEvent)
+		_, err := memoryStorage.Create(deliveryEvent)
 
 		require.True(t, errors.Is(err, storage.ErrDateAlreadyBusy))
 	})
