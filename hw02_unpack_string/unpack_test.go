@@ -1,4 +1,4 @@
-package hw02unpackstring
+package main
 
 import (
 	"errors"
@@ -40,6 +40,17 @@ func TestUnpackInvalidString(t *testing.T) {
 		t.Run(tc, func(t *testing.T) {
 			_, err := Unpack(tc)
 			require.Truef(t, errors.Is(err, ErrInvalidString), "actual error %q", err)
+		})
+	}
+}
+
+func TestCyrilicString(t *testing.T) {
+	cyrilicStrings := []string{"Пов2то2р3и", "Эт3о"}
+	for _, tc := range cyrilicStrings {
+		tc := tc
+		t.Run(tc, func(t *testing.T) {
+			_, err := Unpack(tc)
+			require.Truef(t, err == nil, "actual error %q", err)
 		})
 	}
 }
