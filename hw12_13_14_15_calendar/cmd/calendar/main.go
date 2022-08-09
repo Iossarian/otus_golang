@@ -2,60 +2,86 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
-	"os"
+	"fmt"
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/app"
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/config"
+	"github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/logger"
+	internalHttp "github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/server/http"
+	memoryStorage "github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage/memory"
+	sqlStorage "github.com/Iossarian/otus_golang/hw12_13_14_15_calendar/internal/storage/sql"
+	"net/http"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"github.com/fixme_my_friend/hw12_13_14_15_calendar/internal/app"
-	"github.com/fixme_my_friend/hw12_13_14_15_calendar/internal/logger"
-	internalhttp "github.com/fixme_my_friend/hw12_13_14_15_calendar/internal/server/http"
-	memorystorage "github.com/fixme_my_friend/hw12_13_14_15_calendar/internal/storage/memory"
 )
 
-var configFile string
+var configPath string
+
+const memoryStorageName = "memory"
+const sqlStorageName = "sql"
 
 func init() {
-	flag.StringVar(&configFile, "config", "/etc/calendar/config.toml", "Path to configuration file")
+	flag.StringVar(&configPath, "config", "./../../configs/config.env", "Path to configuration file")
 }
 
 func main() {
 	flag.Parse()
-
 	if flag.Arg(0) == "version" {
 		printVersion()
 		return
 	}
 
-	config := NewConfig()
-	logg := logger.New(config.Logger.Level)
+	appConfig := config.NewConfig(configPath)
+	logg := logger.New(appConfig)
 
-	storage := memorystorage.New()
-	calendar := app.New(logg, storage)
+	storageSource := getStorage(appConfig)
+	err := storageSource.Connect(context.Background())
+	if err != nil {
+		logg.Error(fmt.Errorf("fail open storage: %w", err))
+	}
+	defer func(storageSource app.Storage) {
+		err := storageSource.Close()
+		if err != nil {
+			logg.Error(err)
+		}
+	}(storageSource)
 
-	server := internalhttp.NewServer(logg, calendar)
+	calendar := app.New(logg, storageSource)
+
+	server := internalHttp.NewServer(logg, calendar, appConfig)
 
 	ctx, cancel := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
 
 	go func() {
-		<-ctx.Done()
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-		defer cancel()
-
-		if err := server.Stop(ctx); err != nil {
-			logg.Error("failed to stop http server: " + err.Error())
+		logg.Info(fmt.Errorf("%s", "calendar is running..."))
+		if err := server.Start(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logg.Info(fmt.Errorf("listen: %w", err))
 		}
 	}()
 
-	logg.Info("calendar is running...")
+	<-ctx.Done()
 
-	if err := server.Start(ctx); err != nil {
-		logg.Error("failed to start http server: " + err.Error())
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second)
+	defer func() {
 		cancel()
-		os.Exit(1) //nolint:gocritic
+	}()
+
+	if err := server.Stop(ctx); err != nil {
+		logg.Error(err)
+	}
+}
+
+func getStorage(c config.Config) app.Storage {
+	switch c.StorageSource {
+	case memoryStorageName:
+		return memoryStorage.New()
+	case sqlStorageName:
+		return sqlStorage.New(c)
+	default:
+		return sqlStorage.New(c)
 	}
 }
