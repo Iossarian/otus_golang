@@ -15,6 +15,13 @@ func TestList(t *testing.T) {
 		require.Nil(t, l.Back())
 	})
 
+	t.Run("front is equal to back", func(t *testing.T) {
+		l := NewList()
+		l.PushBack(10)
+
+		require.Equal(t, l.Front(), l.Back())
+	})
+
 	t.Run("complex", func(t *testing.T) {
 		l := NewList()
 
@@ -47,5 +54,6 @@ func TestList(t *testing.T) {
 			elems = append(elems, i.Value.(int))
 		}
 		require.Equal(t, []int{70, 80, 60, 40, 10, 30, 50}, elems)
+		require.Nil(t, l.Back().Next)
 	})
 }
