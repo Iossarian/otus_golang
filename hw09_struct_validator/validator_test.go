@@ -2,7 +2,9 @@ package hw09structvalidator
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -36,16 +38,33 @@ type (
 	}
 )
 
-func TestValidate(t *testing.T) {
+func TestValidateWithErrors(t *testing.T) {
 	tests := []struct {
 		in          interface{}
 		expectedErr error
 	}{
 		{
-			// Place your code here.
+			in: App{"v1.1"},
+			expectedErr: ValidationErrors{
+				ValidationError{Field: "Version", Err: ErrStringLen},
+			},
 		},
-		// ...
-		// Place your code here.
+		{
+			in: User{
+				ID:     "1",
+				Name:   "Nick",
+				Age:    20,
+				Email:  "test",
+				Role:   "user",
+				Phones: []string{"89999999999"},
+				meta:   json.RawMessage("does not matter"),
+			},
+			expectedErr: ValidationErrors{
+				ValidationError{Field: "ID", Err: ErrStringLen},
+				ValidationError{Field: "Email", Err: ErrStringRegexp},
+				ValidationError{Field: "Role", Err: ErrStringOutOfList},
+			},
+		},
 	}
 
 	for i, tt := range tests {
@@ -53,8 +72,41 @@ func TestValidate(t *testing.T) {
 			tt := tt
 			t.Parallel()
 
-			// Place your code here.
-			_ = tt
+			err := Validate(tt.in)
+
+			assert.True(t, errors.As(err, &tt.expectedErr))
+			assert.Equal(t, tt.expectedErr.Error(), err.Error())
+		})
+	}
+}
+
+func TestValidateWithoutErrors(t *testing.T) {
+	tests := []interface{}{
+		App{Version: "v1234"},
+		Token{},
+		User{
+			ID:     "fbac1f75-cb30-4048-9519-5b2156602762",
+			Name:   "Nick",
+			Age:    20,
+			Email:  "test@test.com",
+			Role:   "admin",
+			Phones: []string{"89999999999"},
+			meta:   json.RawMessage("does not matter"),
+		},
+		Response{
+			Code: 200,
+			Body: "does not matter",
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			tt := tt
+			t.Parallel()
+
+			err := Validate(tt)
+
+			assert.Nil(t, err)
 		})
 	}
 }
