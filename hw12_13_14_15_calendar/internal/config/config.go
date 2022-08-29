@@ -3,10 +3,10 @@ package config
 import (
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	yaml "gopkg.in/yaml.v3"
-	"os"
 )
 
 type Config struct {
